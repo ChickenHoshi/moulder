@@ -85,7 +85,7 @@ class Vector2(object):
 
 
 class MouldSquare():
-     def __init__(self, pos = Vector2(100,100), resolution = Vector2(9,6), size = Vector2(300,200)):
+     def __init__(self, pos = Vector2(100,100), resolution = Vector2(36,24), size = Vector2(300,200)):
           self.pos = pos
           self.res = resolution
           self.size = size
@@ -99,25 +99,54 @@ class MouldSquare():
                for j in range(self.res.x + 1):
                     x = self.pos.x + j * w
                     y = self.pos.y + i * h
-                    self.points[-1].append(Vector2(x,y))
-     def draw(self):
-          for row in range(len(self.points)-1):
-               for col in range(len(self.points[row])-1):
-                    pygame.draw.polygon(DISPLAYSURF, BLACK, (
-                              self.points[row][col].get_tuple(),
-                              self.points[row + 1][col].get_tuple(),
-                              self.points[row + 1][col + 1].get_tuple(),
-                              self.points[row][col + 1].get_tuple(),
-                         ),2)
+                    self.points[-1].append(ProtoMaterial(Vector2(x,y)))
+     def draw(self, mode = 1):
+          if mode == 1:
+               for row in range(len(self.points)-1):
+                    for col in range(len(self.points[row])-1):
+                         pygame.draw.polygon(DISPLAYSURF, self.get_color(row,col), (
+                                   self.points[row][col].pos.get_tuple(),
+                                   self.points[row + 1][col].pos.get_tuple(),
+                                   self.points[row + 1][col + 1].pos.get_tuple(),
+                                   self.points[row][col + 1].pos.get_tuple(),
+                              ))
+##          elif mode == 2:
+##               for col in range(len(self.points[0])-1):
+##                    pygame.draw.line(DISPLAYSURF,BLACK,self.points[0][col].get_tuple()
+##                                     ,self.points[0][col + 1].get_tuple())
+##                    pygame.draw.line(DISPLAYSURF,BLACK,self.points[self.res.y][col].get_tuple()
+##                                     ,self.points[self.res.y][col + 1].get_tuple())
+##               for row in range(len(self.points)-1):
+##                    pygame.draw.line(DISPLAYSURF,BLACK,self.points[row][0].get_tuple()
+##                                     ,self.points[row+1][0].get_tuple())
+##                    pygame.draw.line(DISPLAYSURF,BLACK,self.points[row][self.res.x].get_tuple()
+##                                     ,self.points[row+1][self.res.x].get_tuple())
      def update(self):
-          for row in range(len(self.points)-1):
-               for col in range(len(self.points[row])-1):
-                    if (self.points[row][col] - self.points[row + 1][col]).y > 0:
-                         self.points[row][col] = self.points[row + 1][col]
-                    if (self.points[row][col] - self.points[row][col + 1]).x > 0:
-                         self.points[row][col] = self.points[row][col + 1]
-                    
+          for row in range(len(self.points)):
+               for col in range(len(self.points[row])):
+                    if self.points[row][col].temp > 273: self.points[row][col].temp -= (self.points[row][col].temp-273)*.001
+                    elif self.points[row][col].temp < 273: self.points[row][col].temp -= (self.points[row][col].temp-273)*.001
+                    if self.points[row][col].temp < 273 < 1: self.points[row][col].temp  = 1
+                    if self.points[row][col].pos.y < 20: self.points[row][col].pos.y = 20
+                    if self.points[row][col].pos.y > windowY - 20: self.points[row][col].pos.y = windowY - 20
+                    if self.points[row][col].pos.x < 20: self.points[row][col].pos.x = 20
+                    if self.points[row][col].pos.x > windowX - 20: self.points[row][col].pos.x = windowX - 20
+     def get_color(self,row, col):
+          n = (self.points[row][col].temp + self.points[row+1][col].temp +\
+              self.points[row+1][col+1].temp + self.points[row][col+1].temp)/4
+          if n > 500: n = 500
+          elif n < 0: n = 0
+          c = n/500*255
+          return (c,c,c)
                
+          
+                    
+                    
+class ProtoMaterial():
+     def __init__(self, pos = Vector2(), temp = 273):
+          self.pos = pos
+          self.temp = temp
+     
                
                   
 
@@ -134,13 +163,19 @@ class MouldSquare():
                                                                          
 '''
 
-def hammer(size, pointList):
+def hammer(size, pointList, heat = False, cool = False):
      m = Vector2(G.mpos[0],G.mpos[1])
      for row in range(len(pointList)):
           for col in range(len(pointList[row])):
-               dp = pointList[row][col]-m
-               if dp.get_magnitude() <= size:
-                    pointList[row][col] += dp*(0.02)
+               dp = pointList[row][col].pos-m
+               dmag = dp.get_magnitude()
+               if dmag == 0: dmag = 0.001
+               if heat:
+                    pointList[row][col].temp += 100/(dmag)
+               elif cool:
+                    pointList[row][col].temp -= 100/(dmag)
+               else:
+                    pointList[row][col].pos += dp*(900/(dmag*900000000/(pointList[row][col].temp*100)))
 
 G = Game('Moulder')
 def main():
@@ -155,6 +190,11 @@ def main():
           G.update(fpsClock)
           if G.lmb:
                hammer(50, m.points)
+
+          elif G.keys[K_SPACE]:
+               hammer(50, m.points, True)
+          elif G.keys[K_c]:
+               hammer(50, m.points, cool = True)
           m.update()
           DISPLAYSURF.fill(WHITE)
           m.draw()
